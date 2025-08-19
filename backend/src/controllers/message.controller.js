@@ -37,32 +37,53 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
+    
+    let text, imageUrl;
 
-    let imageUrl;
-    if (image) {
+    
+    if (req.file) {
+      text = req.body.text;
       
-      const uploadResponse = await cloudinary.uploader.upload(image);
+      const uploadResponse = await cloudinary.uploader.upload(req.file.path);
       imageUrl = uploadResponse.secure_url;
+    } 
+    
+    else if (req.body.image && req.body.image.startsWith('data:image/')) {
+      text = req.body.text;
+      const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, 'base64');
+      const uploadResponse = await cloudinary.uploader.upload(buffer, { resource_type: "image" });
+      imageUrl = uploadResponse.secure_url;
+    }
+    
+    else {
+      text = req.body.text;
+      imageUrl = null;
     }
 
     const newMessage = new Message({
       senderId,
       receiverId,
-      text,
-      image: imageUrl,
+      text: text || null, 
+      image: imageUrl || null,
     });
 
-    await newMessage.save();
+    const savedMessage = await newMessage.save();
 
+    
+    const populatedMessage = await Message.findById(savedMessage._id)
+      .populate('senderId', 'fullName profilePic')
+      .populate('receiverId', 'fullName profilePic');
+
+    // Emit socket event
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
+      io.to(receiverSocketId).emit("newMessage", populatedMessage);
     }
 
-    res.status(201).json(newMessage);
+    res.status(201).json(populatedMessage);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });

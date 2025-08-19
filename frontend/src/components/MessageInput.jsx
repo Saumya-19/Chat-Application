@@ -6,16 +6,23 @@ import toast from "react-hot-toast";
 const MessageInput = () => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null); // Store the actual file
   const fileInputRef = useRef(null);
   const { sendMessage } = useChatStore();
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
+    if (!file) return;
+    
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
 
+    // Store the file for upload
+    setSelectedFile(file);
+
+    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result);
@@ -25,22 +32,28 @@ const MessageInput = () => {
 
   const removeImage = () => {
     setImagePreview(null);
+    setSelectedFile(null); // Clear the file too
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!text.trim() && !imagePreview) return;
+    if (!text.trim() && !selectedFile) return;
 
     try {
-      await sendMessage({
-        text: text.trim(),
-        image: imagePreview,
-      });
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append("text", text.trim());
+      if (selectedFile) {
+        formData.append("image", selectedFile);
+      }
+
+      await sendMessage(formData); // Send FormData instead of raw object
 
       // Clear form
       setText("");
       setImagePreview(null);
+      setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -69,7 +82,7 @@ const MessageInput = () => {
         </div>
       )}
 
-      <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+      <form onSubmit={handleSendMessage} className="flex items-center gap-2" encType="multipart/form-data">
         <div className="flex-1 flex gap-2">
           <input
             type="text"
@@ -98,7 +111,7 @@ const MessageInput = () => {
         <button
           type="submit"
           className="btn btn-sm btn-circle"
-          disabled={!text.trim() && !imagePreview}
+          disabled={!text.trim() && !selectedFile}
         >
           <Send size={22} />
         </button>
