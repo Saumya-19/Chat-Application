@@ -14,9 +14,10 @@ const Sidebar = () => {
     getUsers();
   }, [getUsers]);
 
-  const filteredUsers = showOnlineOnly
-    ? users.filter((user) => onlineUsers.includes(user._id))
-    : users;
+  const filteredUsers = (showOnlineOnly
+  ? users.filter((user) => onlineUsers.includes(user.id))
+  : users
+).filter(user => user.fullName && user.fullName.trim() !== "");
 
   if (isUsersLoading) return <SidebarSkeleton />;
 
@@ -70,9 +71,19 @@ const Sidebar = () => {
             {/* User info - only visible on larger screens */}
             <div className="hidden lg:block text-left min-w-0">
               <div className="font-medium truncate">{user.fullName}</div>
-              <div className="text-sm text-zinc-400">
-                {onlineUsers.includes(user._id) ? "Online" : "Offline"}
-              </div>
+               <div className="text-sm text-zinc-400 truncate w-[180px]">
+                <p className="text-gray-400 italic">
+                   {user.lastMessage ? user.lastMessage : "No messages yet"}</p>
+                  </div>
+
+  {/* Online/Offline */}
+  <div className="text-xs mt-0.5">
+    {onlineUsers.includes(user.id) ? (
+      <span className="text-green-500">Online</span>
+    ) : (
+      <span className="text-gray-400">Offline</span>
+    )}
+  </div>
             </div>
           </button>
         ))}
