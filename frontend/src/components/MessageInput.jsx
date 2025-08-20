@@ -37,28 +37,39 @@ const MessageInput = () => {
   };
 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!text.trim() && !selectedFile) return;
+  e.preventDefault();
+  
+  if (!text.trim() && !imagePreview) {
+    toast.error("Message cannot be empty");
+    return;
+  }
 
-    try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append("text", text.trim());
-      if (selectedFile) {
-        formData.append("image", selectedFile);
-      }
+  console.log("=== FRONTEND DEBUG ===");
+  console.log("Text content:", text);
+  console.log("Image preview exists:", !!imagePreview);
+  console.log("======================");
 
-      await sendMessage(formData); // Send FormData instead of raw object
+  try {
+    // Create the message data
+    const messageData = {
+      text: text.trim(),
+      image: imagePreview
+    };
 
-      // Clear form
-      setText("");
-      setImagePreview(null);
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch (error) {
-      console.error("Failed to send message:", error);
-    }
-  };
+    console.log("Sending this data:", messageData);
+    
+    await sendMessage(messageData);
+
+    // Clear form
+    setText("");
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    toast.error("Failed to send message");
+  }
+};
 
   return (
     <div className="p-4 w-full">

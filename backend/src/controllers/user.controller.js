@@ -1,5 +1,4 @@
-
-   import User from "../models/user.model.js";
+import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 
 export const getUsers = async (req, res) => {
@@ -11,8 +10,8 @@ export const getUsers = async (req, res) => {
         const lastMsg = await Message.findOne({
           $or: [
             { senderId: req.user._id, receiverId: u._id },
-            { senderId: u._id, receiverId: req.user._id }
-          ]
+            { senderId: u._id, receiverId: req.user._id },
+          ],
         })
           .sort({ createdAt: -1 })
           .limit(1);
@@ -23,13 +22,18 @@ export const getUsers = async (req, res) => {
           profilePic: u.profilePic,
           status: u.status,
           lastMessage: lastMsg
-            ? (lastMsg.text ? lastMsg.text : "📷 Image")
+            ? (lastMsg.text && lastMsg.text.trim() !== ""
+                ? lastMsg.text
+                : lastMsg.image
+                ? "📷 Image"
+                : "")
             : "",
           lastMessageTime: lastMsg ? lastMsg.createdAt : null,
         };
       })
     );
 
+    // ✅ sort users by latest message time
     usersWithLastMsg.sort((a, b) => {
       if (!a.lastMessageTime) return 1;
       if (!b.lastMessageTime) return -1;
@@ -41,5 +45,6 @@ export const getUsers = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 

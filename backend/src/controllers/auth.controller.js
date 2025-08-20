@@ -33,7 +33,7 @@ export const signup = async (req, res) => {
       await newUser.save();
 
       res.status(201).json({
-        _id: newUser._id,
+        id: newUser._id,
         fullName: newUser.fullName,
         email: newUser.email,
         profilePic: newUser.profilePic,
@@ -64,7 +64,7 @@ export const login = async (req, res) => {
     generateToken(user._id, res);
 
     res.status(200).json({
-      _id: user._id,
+      id: user._id,
       fullName: user.fullName,
       email: user.email,
       profilePic: user.profilePic,

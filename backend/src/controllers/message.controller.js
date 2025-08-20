@@ -26,7 +26,10 @@ export const getMessages = async (req, res) => {
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
-    });
+    })
+    .populate('senderId', 'fullName profilePic') 
+    .populate('receiverId', 'fullName profilePic') 
+    .sort({ createdAt: 1 }); 
 
     res.status(200).json(messages);
   } catch (error) {
@@ -37,45 +40,56 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
+
+       console.log("=== SEND MESSAGE DEBUG ===");
+    console.log("req.params.id:", req.params.id);
+    console.log("req.user:", req.user?._id);
+    console.log("req.body:", req.body);
+    console.log("==========================");
+
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
-    
-    let text, imageUrl;
 
     
+
+    let text = req.body?.text || "";
+    let imageUrl = null;
+
+    // If file upload via Multer
     if (req.file) {
-      text = req.body.text;
-      
       const uploadResponse = await cloudinary.uploader.upload(req.file.path);
       imageUrl = uploadResponse.secure_url;
-    } 
-    
-    else if (req.body.image && req.body.image.startsWith('data:image/')) {
-      text = req.body.text;
-      const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, 'base64');
-      const uploadResponse = await cloudinary.uploader.upload(buffer, { resource_type: "image" });
+    }
+    // If base64 image string
+    else if (req.body.image && req.body.image.startsWith("data:image/")) {
+      const uploadResponse = await cloudinary.uploader.upload(req.body.image);
       imageUrl = uploadResponse.secure_url;
     }
-    
-    else {
-      text = req.body.text;
-      imageUrl = null;
+
+    const hasText = typeof text === "string" && text.trim() !== "";
+    const hasImage = !!imageUrl;
+
+    if (!hasText && !hasImage) {
+      return res.status(400).json({ error: "Message must contain text or image" });
     }
 
     const newMessage = new Message({
       senderId,
       receiverId,
-      text: text || null, 
-      image: imageUrl || null,
+      text: hasText ? text.trim() : null,
+      image: hasImage ? imageUrl : null,
     });
 
     const savedMessage = await newMessage.save();
 
-    
     const populatedMessage = await Message.findById(savedMessage._id)
-      .populate('senderId', 'fullName profilePic')
-      .populate('receiverId', 'fullName profilePic');
+      .populate("senderId", "fullName profilePic")
+      .populate("receiverId", "fullName profilePic")
+      .lean();
+
+    // 🔹 Convert _id → id for frontend consistency
+    populatedMessage.id = populatedMessage._id;
+    delete populatedMessage._id;
 
     // Emit socket event
     const receiverSocketId = getReceiverSocketId(receiverId);
@@ -85,7 +99,7 @@ export const sendMessage = async (req, res) => {
 
     res.status(201).json(populatedMessage);
   } catch (error) {
-    console.log("Error in sendMessage controller: ", error.message);
+    console.log("Error in sendMessage controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

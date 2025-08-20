@@ -51,21 +51,21 @@ sendMessage: async (messageData) => {
     return;
   }
 
-  try {
+ try {
     const res = await axiosInstance.post(
       `/messages/send/${selectedUser.id}`,
       messageData,
       {
         headers: {
-          'Content-Type': 'multipart/form-data', 
+          "Content-Type": "application/json",   // ✅ force JSON
         },
       }
     );
 
-    
     set({ messages: [...messages, res.data] });
   } catch (error) {
-    toast.error(error.response?.data?.message || "Failed to send message");
+    console.error("SendMessage Error:", error.response?.data || error.message);
+    toast.error(error.response?.data?.error || "Failed to send message");
   }
 },
 
