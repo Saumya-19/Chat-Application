@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import http from "http";
 import express from "express";
+import Message from "../models/message.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -26,6 +27,40 @@ io.on("connection", (socket) => {
 
   // io.emit() is used to send events to all the connected clients
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+  socket.on("markAsRead", async ({ from }) => {
+  try {
+    const to = socket.userId; // This might be undefined!
+    
+    // Get the actual user ID from the socket connection
+    const actualUserId = socket.handshake.query.userId;
+    if (!from || !actualUserId) return;
+
+    console.log(`Marking messages as read from ${from} to ${actualUserId}`);
+
+    // Update messages in database
+    await Message.updateMany(
+      { 
+        senderId: from, 
+        receiverId: actualUserId, 
+        read: false 
+      },
+      { $set: { read: true } }
+    );
+
+    // Notify sender that their messages were read
+    const senderSocketId = getReceiverSocketId(from);
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messages:read", { 
+        from: actualUserId,
+        to: from 
+      });
+    }
+  } catch (err) {
+    console.error("Error marking messages read:", err.message);
+  }
+});
+
 
   socket.on("disconnect", () => {
     console.log("A user disconnected", socket.id);

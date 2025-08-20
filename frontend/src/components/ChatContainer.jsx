@@ -16,8 +16,9 @@ const ChatContainer = () => {
     subscribeToMessages,
     unsubscribeFromMessages,
   } = useChatStore();
-  const { authUser } = useAuthStore();
+  
   const messageEndRef = useRef(null);
+  const { authUser, socket } = useAuthStore();
 
   useEffect(() => {
     if (selectedUser && selectedUser.id) {
@@ -36,6 +37,23 @@ const ChatContainer = () => {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  useEffect(() => {
+  if (selectedUser?.id) {
+    getMessages(selectedUser.id);
+    subscribeToMessages();
+
+    // Only mark as read if we have a valid socket and user
+    if (socket && selectedUser.id) {
+      socket.emit("markAsRead", {
+        from: selectedUser.id, 
+      });
+    }
+
+    return () => unsubscribeFromMessages();
+  }
+}, [selectedUser?.id, socket, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+
 
   if (!selectedUser) {
     return (
@@ -123,6 +141,18 @@ const ChatContainer = () => {
                     />
                   )}
                   {message.text && <p>{message.text}</p>}
+                      
+                       {/* ✅ WhatsApp-style ticks */}
+       {isOwnMessage && (
+    <span
+      className={`ml-auto mt-1 text-xs flex items-center gap-1 ${
+        message.read ? "text-blue-500" : "text-gray-400"
+      }`}
+    >
+      {message.read ? "✔✔" : "✔"}
+    </span>
+  )}
+
                 </div>
               </div>
             );

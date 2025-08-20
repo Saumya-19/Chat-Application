@@ -41,56 +41,100 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // 🔹 Send a message
+  sendMessage: async (messageData) => {
+    const { selectedUser, messages, users } = get();
+    
+    if (!selectedUser || !selectedUser.id) {
+      toast.error("Please select a user to message");
+      return;
+    }
 
- 
-sendMessage: async (messageData) => {
-  const { selectedUser, messages } = get();
-  
-  if (!selectedUser || !selectedUser.id) {
-    toast.error("Please select a user to message");
-    return;
-  }
+    try {
+      const res = await axiosInstance.post(
+        `/messages/send/${selectedUser.id}`,
+        messageData,
+        {
+          headers: {
+            "Content-Type": "application/json",   // ✅ force JSON
+          },
+        }
+      );
 
- try {
-    const res = await axiosInstance.post(
-      `/messages/send/${selectedUser.id}`,
-      messageData,
-      {
-        headers: {
-          "Content-Type": "application/json",   // ✅ force JSON
-        },
-      }
-    );
+      const newMessage = res.data;
 
-    set({ messages: [...messages, res.data] });
-  } catch (error) {
-    console.error("SendMessage Error:", error.response?.data || error.message);
-    toast.error(error.response?.data?.error || "Failed to send message");
-  }
-},
+      // update messages in chat window
+      set({ messages: [...messages, newMessage] });
 
-  
+      // ✅ also update sidebar with latest msg
+      set({
+        users: users.map((u) =>
+          u.id === selectedUser.id
+            ? {
+                ...u,
+                lastMessage: newMessage.text || "📷 Image",
+                lastMessageTime: newMessage.createdAt,
+              }
+            : u
+        ),
+      });
+    } catch (error) {
+      console.error("SendMessage Error:", error.response?.data || error.message);
+      toast.error(error.response?.data?.error || "Failed to send message");
+    }
+  },
+
+  // 🔹 Subscribe to socket messages
   subscribeToMessages: () => {
-    const { selectedUser } = get();
+    const { selectedUser, users } = get();
     if (!selectedUser) return;
 
     const socket = useAuthStore.getState().socket;
 
     socket.on("newMessage", (newMessage) => {
-      
       const isRelevant =
         newMessage.senderId === selectedUser.id ||
         newMessage.receiverId === selectedUser.id;
 
-      if (!isRelevant) return;
+      if (isRelevant) {
+        set({
+          messages: [...get().messages, newMessage],
+        });
+      }
 
+      // ✅ update sidebar when new message comes
       set({
-        messages: [...get().messages, newMessage],
+        users: users.map((u) =>
+          u.id === newMessage.senderId || u.id === newMessage.receiverId
+            ? {
+                ...u,
+                lastMessage: newMessage.text || "📷 Image",
+                lastMessageTime: newMessage.createdAt,
+              }
+            : u
+        ),
       });
     });
+
+   
+socket.on("messages:read", ({ from, to }) => {
+  const authUser = useAuthStore.getState().authUser;
+  
+  
+  const isRelevant = from === authUser._id;
+  
+  if (isRelevant) {
+    set({
+      messages: get().messages.map((msg) =>
+        msg.senderId === to || msg.senderId?._id === to
+          ? { ...msg, read: true }
+          : msg
+      ),
+    });
+  }
+});
   },
 
-  
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket.off("newMessage");
